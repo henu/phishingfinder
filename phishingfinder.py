@@ -39,6 +39,22 @@ def main():
 
 	conv_table = formCompleteConversionTable(domain, BASIC_CONV_TABLE)
 
+	# Now start forming different combinations. All combinations consist of three different
+	# modifications: conversion of letters, adding of letters and removing of letters.
+	# What varies is the amounts of these modifications. The following variable is used to
+	# track the combinations of these amounts
+	modcounts = [1, 0, 0]
+	while True:
+		# These are the amount of conversions we will make
+		mod_convs = modcounts[0]
+		mod_adds = modcounts[1]
+		mod_removes = modcounts[2]
+
+		# Do modificationms
+		# TODO: Code this!
+
+		modcounts = getNextModCountsCombination(modcounts)
+
 
 def formCompleteConversionTable(domain, source_conversion_table):
 	""" Forms complete conversion table, where every conversion from the letters of domain has score to every letter possible in domain names.
@@ -62,6 +78,23 @@ def formCompleteConversionTable(domain, source_conversion_table):
 				conv_table[frm][to] = 1
 
 	return conv_table
+
+
+def getNextModCountsCombination(modcounts):
+	total_mods  = sum(modcounts)
+
+	# In case of final combination with these
+	# counts, increase the number of counts
+	if modcounts[2] == total_mods:
+		return [total_mods + 1, 0, 0]
+
+	# If we should lower the first number
+	if modcounts[0] + modcounts[2] == total_mods:
+		return [modcounts[0] - 1, total_mods - modcounts[0] + 1, 0]
+
+	# Decrease middle number
+	return [modcounts[0], modcounts[1] - 1, modcounts[2] + 1]
+
 
 if __name__ == '__main__':
 	main()
