@@ -3,6 +3,7 @@ import sys
 import string
 import socket
 from time import sleep
+import os
 
 
 BASIC_CONV_TABLE = {
@@ -39,6 +40,16 @@ def main():
 		raise Exception('Invalid arguments! Usage: ' + sys.argv[0] + ' <domain>')
 	domain = sys.argv[1].lower()
 
+	# Read already known clones
+	known_clones_path = os.path.expanduser('~/.config/phishingfinder/known_clones_for_' + domain)
+	known_clones = set()
+	if os.path.exists(known_clones_path):
+		with open(known_clones_path) as f:
+			for line in f:
+				line = line.strip()
+				if line:
+					known_clones.add(line)
+
 	# The variable at the end is the score that will be added to those that
 	# the user has not supplied any value. If it's zero, those cases are not
 	# even tested. If you really want to test all possible letter conversions,
@@ -50,20 +61,34 @@ def main():
 	# What varies is the amounts of these modifications. The following variable is used to
 	# track the combinations of these amounts
 	modcounts = [1, 0, 0]
-	while True:
-		# Do modifications
-		modifyAndCheckDomain(domain, modcounts, [0, 0, 0], conv_table)
+	try:
+		while True:
+			# Do modifications
+			modifyAndCheckDomain(domain, modcounts, [0, 0, 0], conv_table, known_clones)
 
-		modcounts = getNextModCountsCombination(modcounts)
+			modcounts = getNextModCountsCombination(modcounts)
+	except:
+		# Write known clones
+		directory = os.path.abspath(os.path.join(known_clones_path, os.pardir))
+		if not os.path.exists(directory):
+			os.makedirs(directory)
+		with open(known_clones_path + '_TEMP', 'w') as f:
+			for clone in known_clones:
+				f.write(clone + '\n')
+		os.rename(known_clones_path + '_TEMP', known_clones_path)
 
 
-def modifyAndCheckDomain(domain, modcounts, modpositions, conv_table):
+def modifyAndCheckDomain(domain, modcounts, modpositions, conv_table, known_clones):
 
 	# If there is no conversion options left, then check the domain
 	if sum(modcounts) == 0:
 		try:
 			socket.gethostbyname(domain)
-			print domain + ' EXISTS!'
+			if domain in known_clones:
+				print domain + ' EXISTS!'
+			else:
+				known_clones.add(domain)
+				print domain + ' EXISTS! * * * * N E W * * * *'
 		except socket.gaierror:
 			pass
 		# Sleep a little to not spam DNS server
@@ -79,7 +104,7 @@ def modifyAndCheckDomain(domain, modcounts, modpositions, conv_table):
 				# TODO: Do not accept domains with invalid TLD
 				modcounts2 = [modcounts[0], modcounts[1], modcounts[2] - 1]
 				modpositions2 = [modpositions[0], modpositions[1], pos + 1]
-				modifyAndCheckDomain(converted_domain, modcounts2, modpositions2, conv_table)
+				modifyAndCheckDomain(converted_domain, modcounts2, modpositions2, conv_table, known_clones)
 		return
 
 	# Do letter conversions
@@ -109,7 +134,7 @@ def modifyAndCheckDomain(domain, modcounts, modpositions, conv_table):
 							# TODO: Do not accept domains with invalid TLD
 							modcounts2 = [modcounts[0] - 1, modcounts[1], modcounts[2]]
 							modpositions2 = [pos + 1, modpositions[1], modpositions[2]]
-							modifyAndCheckDomain(converted_domain, modcounts2, modpositions2, conv_table)
+							modifyAndCheckDomain(converted_domain, modcounts2, modpositions2, conv_table, known_clones)
 		return
 
 	# TODO: Do letter addings!
@@ -156,28 +181,28 @@ def getNextModCountsCombination(modcounts):
 
 
 class rangeFromCenter(object):
-		def __init__(self, start, end):
-			self.start = start
-			self.end = end
-			# Begin is not used when selecting center
-			self.center = end / 2
-			self.diff = 0
-			self.next_is_negative = True
-		def __iter__(self):
-			return self
-		def __next__(self):
-			return self.next()
-		def next(self):
-			while self.center - self.diff >= self.start or self.center + self.diff < self.end:
-				pos = self.center + (-self.diff if self.next_is_negative else self.diff)
-				if self.next_is_negative and self.diff > 0:
-					self.next_is_negative = False
-				else:
-					self.next_is_negative = True
-					self.diff += 1
-				if pos >= self.start and pos < self.end:
-					return pos
-			raise StopIteration()
+	def __init__(self, start, end):
+		self.start = start
+		self.end = end
+		# Begin is not used when selecting center
+		self.center = end / 2
+		self.diff = 0
+		self.next_is_negative = True
+	def __iter__(self):
+		return self
+	def __next__(self):
+		return self.next()
+	def next(self):
+		while self.center - self.diff >= self.start or self.center + self.diff < self.end:
+			pos = self.center + (-self.diff if self.next_is_negative else self.diff)
+			if self.next_is_negative and self.diff > 0:
+				self.next_is_negative = False
+			else:
+				self.next_is_negative = True
+				self.diff += 1
+			if pos >= self.start and pos < self.end:
+				return pos
+		raise StopIteration()
 
 
 if __name__ == '__main__':
